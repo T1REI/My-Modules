@@ -27,10 +27,12 @@ FOVCircle.Filled = false
 FOVCircle.Visible = false
 FOVCircle.Color = Settings.FOVColor
 FOVCircle.Transparency = 1
+FOVCircle.ZIndex = 999
 
 local CurrentTarget = nil
 local IsAiming = false
 local RenderConnection = nil
+local InputConnection = nil
 
 local function GetClosestPlayer()
     local closestPlayer = nil
@@ -93,10 +95,15 @@ function AimModule:SetEnabled(enabled)
         if RenderConnection then
             RenderConnection:Disconnect()
         end
+        if InputConnection then
+            InputConnection:Disconnect()
+        end
         
         RenderConnection = RunService.RenderStepped:Connect(function()
             local mousePos = UserInputService:GetMouseLocation()
             FOVCircle.Position = mousePos
+            FOVCircle.Radius = Settings.FOVSize
+            FOVCircle.Thickness = Settings.FOVThickness
             
             if Settings.FOVVisible then
                 FOVCircle.Visible = true
@@ -128,7 +135,9 @@ function AimModule:SetEnabled(enabled)
         end)
         
         if Settings.ActivateMode == "Toggle" then
-            UserInputService.InputBegan:Connect(function(input)
+            InputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then return end
+                
                 if input.UserInputType == Settings.Keybind or input.KeyCode == Settings.Keybind then
                     IsAiming = not IsAiming
                 end
@@ -138,6 +147,10 @@ function AimModule:SetEnabled(enabled)
         if RenderConnection then
             RenderConnection:Disconnect()
             RenderConnection = nil
+        end
+        if InputConnection then
+            InputConnection:Disconnect()
+            InputConnection = nil
         end
         FOVCircle.Visible = false
         IsAiming = false
@@ -153,6 +166,11 @@ function AimModule:Disable()
         RenderConnection = nil
     end
     
+    if InputConnection then
+        InputConnection:Disconnect()
+        InputConnection = nil
+    end
+    
     FOVCircle.Visible = false
     IsAiming = false
     CurrentTarget = nil
@@ -160,6 +178,21 @@ end
 
 function AimModule:SetActivateMode(mode)
     Settings.ActivateMode = mode
+    
+    if InputConnection then
+        InputConnection:Disconnect()
+        InputConnection = nil
+    end
+    
+    if mode == "Toggle" and Settings.Enabled then
+        InputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            
+            if input.UserInputType == Settings.Keybind or input.KeyCode == Settings.Keybind then
+                IsAiming = not IsAiming
+            end
+        end)
+    end
 end
 
 function AimModule:SetFOVVisible(visible)
@@ -200,8 +233,23 @@ end
 function AimModule:SetKeybind(keybind)
     if keybind == "MouseButton2" then
         Settings.Keybind = Enum.UserInputType.MouseButton2
-    else
+    elseif Enum.KeyCode[keybind] then
         Settings.Keybind = Enum.KeyCode[keybind]
+    end
+    
+    if InputConnection then
+        InputConnection:Disconnect()
+        InputConnection = nil
+    end
+    
+    if Settings.ActivateMode == "Toggle" and Settings.Enabled then
+        InputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            
+            if input.UserInputType == Settings.Keybind or input.KeyCode == Settings.Keybind then
+                IsAiming = not IsAiming
+            end
+        end)
     end
 end
 
