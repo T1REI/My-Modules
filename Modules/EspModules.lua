@@ -12,7 +12,10 @@ local Settings = {
     BoxColor = Color3.fromRGB(255, 255, 255),
     Tracers = false,
     TracersPosition = "Center",
-    TracersColor = Color3.fromRGB(255, 255, 255)
+    TracersColor = Color3.fromRGB(255, 255, 255),
+    Chams = false,
+    VisibleChamsColor = Color3.fromRGB(0, 255, 0),
+    InvisibleChamsColor = Color3.fromRGB(255, 0, 0)
 }
 
 local function CreateDrawing(Type)
@@ -24,7 +27,8 @@ local function CreateESP(player)
     local esp = {
         Player = player,
         Drawings = {},
-        Tracer = nil
+        Tracer = nil,
+        Chams = {}
     }
     
     for i = 1, 4 do
@@ -59,6 +63,100 @@ local function RemoveESP(esp)
     if esp.Tracer then
         esp.Tracer:Remove()
     end
+    if esp.Chams then
+        for _, part in pairs(esp.Chams) do
+            if part then
+                part:Destroy()
+            end
+        end
+    end
+end
+
+local function ApplyChams(character)
+    if not character then return {} end
+    
+    local chams = {}
+    
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            local highlight = Instance.new("Highlight")
+            highlight.Adornee = part
+            highlight.FillColor = Settings.VisibleChamsColor
+            highlight.OutlineColor = Settings.InvisibleChamsColor
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Parent = part
+            
+            local beam = Instance.new("Beam")
+            local att0 = Instance.new("Attachment")
+            local att1 = Instance.new("Attachment")
+            att0.Parent = part
+            att1.Parent = part
+            att1.Position = Vector3.new(0, part.Size.Y, 0)
+            beam.Attachment0 = att0
+            beam.Attachment1 = att1
+            beam.Color = ColorSequence.new(Settings.VisibleChamsColor)
+            beam.FaceCamera = true
+            beam.Width0 = 0.1
+            beam.Width1 = 0.1
+            beam.Transparency = NumberSequence.new(0.7)
+            beam.Parent = part
+            
+            table.insert(chams, highlight)
+            table.insert(chams, beam)
+            table.insert(chams, att0)
+            table.insert(chams, att1)
+        end
+    end
+    
+    return chams
+end
+
+local function UpdateChams(esp)
+    if Settings.Chams then
+        local character = esp.Player.Character
+        if character and #esp.Chams == 0 then
+            esp.Chams = ApplyChams(character)
+        end
+        
+        if character then
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local ray = Ray.new(Camera.CFrame.Position, (hrp.Position - Camera.CFrame.Position).Unit * 1000)
+                local hit = workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character})
+                
+                local isVisible = hit and hit:IsDescendantOf(character)
+                
+                for _, obj in pairs(esp.Chams) do
+                    if obj:IsA("Highlight") then
+                        if isVisible then
+                            obj.FillColor = Settings.VisibleChamsColor
+                            obj.OutlineColor = Settings.VisibleChamsColor
+                        else
+                            obj.FillColor = Settings.InvisibleChamsColor
+                            obj.OutlineColor = Settings.InvisibleChamsColor
+                        end
+                    elseif obj:IsA("Beam") then
+                        if isVisible then
+                            obj.Color = ColorSequence.new(Settings.VisibleChamsColor)
+                        else
+                            obj.Color = ColorSequence.new(Settings.InvisibleChamsColor)
+                        end
+                    end
+                end
+            end
+        end
+    else
+        if #esp.Chams > 0 then
+            for _, obj in pairs(esp.Chams) do
+                if obj then
+                    obj:Destroy()
+                end
+            end
+            esp.Chams = {}
+        end
+    end
 end
 
 local function UpdateESP(esp)
@@ -72,8 +170,18 @@ local function UpdateESP(esp)
         if esp.Tracer then
             esp.Tracer.Visible = false
         end
+        if #esp.Chams > 0 then
+            for _, obj in pairs(esp.Chams) do
+                if obj then
+                    obj:Destroy()
+                end
+            end
+            esp.Chams = {}
+        end
         return
     end
+    
+    UpdateChams(esp)
     
     local hrp = character.HumanoidRootPart
     local head = character:FindFirstChild("Head")
@@ -285,6 +393,31 @@ function EspModule:SetTracersColor(color)
             esp.Tracer.Color = color
         end
     end
+end
+
+function EspModule:SetChams(enabled)
+    Settings.Chams = enabled
+    
+    if not enabled then
+        for _, esp in pairs(ESPObjects) do
+            if #esp.Chams > 0 then
+                for _, obj in pairs(esp.Chams) do
+                    if obj then
+                        obj:Destroy()
+                    end
+                end
+                esp.Chams = {}
+            end
+        end
+    end
+end
+
+function EspModule:SetVisibleChamsColor(color)
+    Settings.VisibleChamsColor = color
+end
+
+function EspModule:SetInvisibleChamsColor(color)
+    Settings.InvisibleChamsColor = color
 end
 
 return EspModule
