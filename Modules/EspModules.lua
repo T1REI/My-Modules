@@ -125,14 +125,7 @@ local function ApplyChams(character)
             highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
             highlight.Parent = character
             
-            local pointLight = Instance.new("PointLight")
-            pointLight.Brightness = 2
-            pointLight.Range = 16
-            pointLight.Color = Settings.VisibleChamsColor
-            pointLight.Parent = part
-            
             table.insert(chams, highlight)
-            table.insert(chams, pointLight)
             table.insert(chams, {Part = part, OriginalTransparency = originalTransparency})
             
             break
@@ -166,12 +159,6 @@ local function UpdateChams(esp)
                             else
                                 obj.FillColor = Settings.InvisibleChamsColor
                                 obj.OutlineColor = Settings.InvisibleChamsColor
-                            end
-                        elseif obj:IsA("PointLight") then
-                            if isVisible then
-                                obj.Color = Settings.VisibleChamsColor
-                            else
-                                obj.Color = Settings.InvisibleChamsColor
                             end
                         end
                     end
