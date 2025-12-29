@@ -15,7 +15,8 @@ local Settings = {
     FOVLockColor = Color3.fromRGB(255, 0, 0),
     TeamCheck = false,
     WallCheck = false,
-    AimPart = "Head"
+    AimPart = "Head",
+    Keybind = Enum.UserInputType.MouseButton2
 }
 
 local FOVCircle = Drawing.new("Circle")
@@ -104,7 +105,11 @@ function AimModule:SetEnabled(enabled)
             end
             
             if Settings.ActivateMode == "Hold" then
-                IsAiming = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+                if Settings.Keybind == Enum.UserInputType.MouseButton2 then
+                    IsAiming = UserInputService:IsMouseButtonPressed(Settings.Keybind)
+                else
+                    IsAiming = UserInputService:IsKeyDown(Settings.Keybind)
+                end
             end
             
             if IsAiming and Settings.Enabled then
@@ -124,7 +129,7 @@ function AimModule:SetEnabled(enabled)
         
         if Settings.ActivateMode == "Toggle" then
             UserInputService.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                if input.UserInputType == Settings.Keybind or input.KeyCode == Settings.Keybind then
                     IsAiming = not IsAiming
                 end
             end)
@@ -190,6 +195,14 @@ end
 
 function AimModule:SetAimPart(part)
     Settings.AimPart = part
+end
+
+function AimModule:SetKeybind(keybind)
+    if keybind == "MouseButton2" then
+        Settings.Keybind = Enum.UserInputType.MouseButton2
+    else
+        Settings.Keybind = Enum.KeyCode[keybind]
+    end
 end
 
 return AimModule
