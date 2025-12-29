@@ -15,7 +15,10 @@ local Settings = {
     TracersColor = Color3.fromRGB(255, 255, 255),
     Chams = false,
     VisibleChamsColor = Color3.fromRGB(0, 255, 0),
-    InvisibleChamsColor = Color3.fromRGB(255, 0, 0)
+    InvisibleChamsColor = Color3.fromRGB(255, 0, 0),
+    TeamCheck = false,
+    HealthBar = false,
+    NameTag = false
 }
 
 local function CreateDrawing(Type)
@@ -28,7 +31,10 @@ local function CreateESP(player)
         Player = player,
         Drawings = {},
         Tracer = nil,
-        Chams = {}
+        Chams = {},
+        HealthBarOutline = nil,
+        HealthBarFill = nil,
+        NameTag = nil
     }
     
     for i = 1, 4 do
@@ -53,6 +59,25 @@ local function CreateESP(player)
     tracer.Visible = false
     esp.Tracer = tracer
     
+    local healthOutline = CreateDrawing("Line")
+    healthOutline.Thickness = 4
+    healthOutline.Color = Color3.fromRGB(0, 0, 0)
+    healthOutline.Visible = false
+    esp.HealthBarOutline = healthOutline
+    
+    local healthFill = CreateDrawing("Line")
+    healthFill.Thickness = 2
+    healthFill.Visible = false
+    esp.HealthBarFill = healthFill
+    
+    local nameTag = CreateDrawing("Text")
+    nameTag.Size = 14
+    nameTag.Center = true
+    nameTag.Outline = true
+    nameTag.Color = Color3.fromRGB(255, 255, 255)
+    nameTag.Visible = false
+    esp.NameTag = nameTag
+    
     return esp
 end
 
@@ -62,6 +87,15 @@ local function RemoveESP(esp)
     end
     if esp.Tracer then
         esp.Tracer:Remove()
+    end
+    if esp.HealthBarOutline then
+        esp.HealthBarOutline:Remove()
+    end
+    if esp.HealthBarFill then
+        esp.HealthBarFill:Remove()
+    end
+    if esp.NameTag then
+        esp.NameTag:Remove()
     end
     if esp.Chams then
         for _, part in pairs(esp.Chams) do
@@ -79,34 +113,29 @@ local function ApplyChams(character)
     
     for _, part in pairs(character:GetDescendants()) do
         if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            local originalTransparency = part.Transparency
+            part.Transparency = 0.3
+            
             local highlight = Instance.new("Highlight")
-            highlight.Adornee = part
+            highlight.Adornee = character
             highlight.FillColor = Settings.VisibleChamsColor
             highlight.OutlineColor = Settings.InvisibleChamsColor
-            highlight.FillTransparency = 0.5
+            highlight.FillTransparency = 0.3
             highlight.OutlineTransparency = 0
             highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            highlight.Parent = part
+            highlight.Parent = character
             
-            local beam = Instance.new("Beam")
-            local att0 = Instance.new("Attachment")
-            local att1 = Instance.new("Attachment")
-            att0.Parent = part
-            att1.Parent = part
-            att1.Position = Vector3.new(0, part.Size.Y, 0)
-            beam.Attachment0 = att0
-            beam.Attachment1 = att1
-            beam.Color = ColorSequence.new(Settings.VisibleChamsColor)
-            beam.FaceCamera = true
-            beam.Width0 = 0.1
-            beam.Width1 = 0.1
-            beam.Transparency = NumberSequence.new(0.7)
-            beam.Parent = part
+            local pointLight = Instance.new("PointLight")
+            pointLight.Brightness = 2
+            pointLight.Range = 16
+            pointLight.Color = Settings.VisibleChamsColor
+            pointLight.Parent = part
             
             table.insert(chams, highlight)
-            table.insert(chams, beam)
-            table.insert(chams, att0)
-            table.insert(chams, att1)
+            table.insert(chams, pointLight)
+            table.insert(chams, {Part = part, OriginalTransparency = originalTransparency})
+            
+            break
         end
     end
     
@@ -129,19 +158,21 @@ local function UpdateChams(esp)
                 local isVisible = hit and hit:IsDescendantOf(character)
                 
                 for _, obj in pairs(esp.Chams) do
-                    if obj:IsA("Highlight") then
-                        if isVisible then
-                            obj.FillColor = Settings.VisibleChamsColor
-                            obj.OutlineColor = Settings.VisibleChamsColor
-                        else
-                            obj.FillColor = Settings.InvisibleChamsColor
-                            obj.OutlineColor = Settings.InvisibleChamsColor
-                        end
-                    elseif obj:IsA("Beam") then
-                        if isVisible then
-                            obj.Color = ColorSequence.new(Settings.VisibleChamsColor)
-                        else
-                            obj.Color = ColorSequence.new(Settings.InvisibleChamsColor)
+                    if typeof(obj) == "Instance" then
+                        if obj:IsA("Highlight") then
+                            if isVisible then
+                                obj.FillColor = Settings.VisibleChamsColor
+                                obj.OutlineColor = Settings.VisibleChamsColor
+                            else
+                                obj.FillColor = Settings.InvisibleChamsColor
+                                obj.OutlineColor = Settings.InvisibleChamsColor
+                            end
+                        elseif obj:IsA("PointLight") then
+                            if isVisible then
+                                obj.Color = Settings.VisibleChamsColor
+                            else
+                                obj.Color = Settings.InvisibleChamsColor
+                            end
                         end
                     end
                 end
@@ -150,8 +181,10 @@ local function UpdateChams(esp)
     else
         if #esp.Chams > 0 then
             for _, obj in pairs(esp.Chams) do
-                if obj then
+                if typeof(obj) == "Instance" and obj then
                     obj:Destroy()
+                elseif typeof(obj) == "table" and obj.Part then
+                    obj.Part.Transparency = obj.OriginalTransparency
                 end
             end
             esp.Chams = {}
@@ -170,13 +203,43 @@ local function UpdateESP(esp)
         if esp.Tracer then
             esp.Tracer.Visible = false
         end
+        if esp.HealthBarOutline then
+            esp.HealthBarOutline.Visible = false
+        end
+        if esp.HealthBarFill then
+            esp.HealthBarFill.Visible = false
+        end
+        if esp.NameTag then
+            esp.NameTag.Visible = false
+        end
         if #esp.Chams > 0 then
             for _, obj in pairs(esp.Chams) do
-                if obj then
+                if typeof(obj) == "Instance" and obj then
                     obj:Destroy()
+                elseif typeof(obj) == "table" and obj.Part then
+                    obj.Part.Transparency = obj.OriginalTransparency
                 end
             end
             esp.Chams = {}
+        end
+        return
+    end
+    
+    if Settings.TeamCheck and player.Team == LocalPlayer.Team then
+        for _, drawing in pairs(esp.Drawings) do
+            drawing.Visible = false
+        end
+        if esp.Tracer then
+            esp.Tracer.Visible = false
+        end
+        if esp.HealthBarOutline then
+            esp.HealthBarOutline.Visible = false
+        end
+        if esp.HealthBarFill then
+            esp.HealthBarFill.Visible = false
+        end
+        if esp.NameTag then
+            esp.NameTag.Visible = false
         end
         return
     end
@@ -193,6 +256,15 @@ local function UpdateESP(esp)
         if esp.Tracer then
             esp.Tracer.Visible = false
         end
+        if esp.HealthBarOutline then
+            esp.HealthBarOutline.Visible = false
+        end
+        if esp.HealthBarFill then
+            esp.HealthBarFill.Visible = false
+        end
+        if esp.NameTag then
+            esp.NameTag.Visible = false
+        end
         return
     end
     
@@ -208,6 +280,15 @@ local function UpdateESP(esp)
         end
         if esp.Tracer then
             esp.Tracer.Visible = false
+        end
+        if esp.HealthBarOutline then
+            esp.HealthBarOutline.Visible = false
+        end
+        if esp.HealthBarFill then
+            esp.HealthBarFill.Visible = false
+        end
+        if esp.NameTag then
+            esp.NameTag.Visible = false
         end
         return
     end
@@ -309,6 +390,47 @@ local function UpdateESP(esp)
     else
         if esp.Tracer then
             esp.Tracer.Visible = false
+        end
+    end
+    
+    if Settings.HealthBar and esp.HealthBarOutline and esp.HealthBarFill then
+        local humanoid = character.Humanoid
+        local healthPercent = humanoid.Health / humanoid.MaxHealth
+        
+        local barX = bottomLeft.X - 7
+        local barTopY = topLeft.Y
+        local barBottomY = bottomLeft.Y
+        local barHeight = barBottomY - barTopY
+        
+        esp.HealthBarOutline.From = Vector2.new(barX, barTopY)
+        esp.HealthBarOutline.To = Vector2.new(barX, barBottomY)
+        esp.HealthBarOutline.Visible = true
+        
+        local healthBarHeight = barHeight * healthPercent
+        esp.HealthBarFill.From = Vector2.new(barX, barBottomY)
+        esp.HealthBarFill.To = Vector2.new(barX, barBottomY - healthBarHeight)
+        esp.HealthBarFill.Color = Color3.fromRGB(
+            255 * (1 - healthPercent),
+            255 * healthPercent,
+            0
+        )
+        esp.HealthBarFill.Visible = true
+    else
+        if esp.HealthBarOutline then
+            esp.HealthBarOutline.Visible = false
+        end
+        if esp.HealthBarFill then
+            esp.HealthBarFill.Visible = false
+        end
+    end
+    
+    if Settings.NameTag and esp.NameTag then
+        esp.NameTag.Text = player.Name
+        esp.NameTag.Position = Vector2.new(headScreen.X, topLeft.Y - 18)
+        esp.NameTag.Visible = true
+    else
+        if esp.NameTag then
+            esp.NameTag.Visible = false
         end
     end
 end
@@ -418,6 +540,18 @@ end
 
 function EspModule:SetInvisibleChamsColor(color)
     Settings.InvisibleChamsColor = color
+end
+
+function EspModule:SetTeamCheck(enabled)
+    Settings.TeamCheck = enabled
+end
+
+function EspModule:SetHealthBar(enabled)
+    Settings.HealthBar = enabled
+end
+
+function EspModule:SetNameTag(enabled)
+    Settings.NameTag = enabled
 end
 
 return EspModule
