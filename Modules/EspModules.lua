@@ -69,6 +69,9 @@ local function UpdateESP(esp)
         for _, drawing in pairs(esp.Drawings) do
             drawing.Visible = false
         end
+        if esp.Tracer then
+            esp.Tracer.Visible = false
+        end
         return
     end
     
@@ -78,6 +81,9 @@ local function UpdateESP(esp)
     if not head then
         for _, drawing in pairs(esp.Drawings) do
             drawing.Visible = false
+        end
+        if esp.Tracer then
+            esp.Tracer.Visible = false
         end
         return
     end
@@ -92,6 +98,9 @@ local function UpdateESP(esp)
         for _, drawing in pairs(esp.Drawings) do
             drawing.Visible = false
         end
+        if esp.Tracer then
+            esp.Tracer.Visible = false
+        end
         return
     end
     
@@ -104,66 +113,78 @@ local function UpdateESP(esp)
     local bottomRight = Vector2.new(legScreen.X + width / 2, legScreen.Y)
     
     if Settings.BoxType == "Full" then
+        for i = 5, 12 do
+            esp.Drawings[i].Visible = false
+        end
+        
         esp.Drawings[1].From = topLeft
         esp.Drawings[1].To = topRight
         esp.Drawings[1].Visible = true
+        esp.Drawings[1].Color = Settings.BoxColor
         
         esp.Drawings[2].From = topRight
         esp.Drawings[2].To = bottomRight
         esp.Drawings[2].Visible = true
+        esp.Drawings[2].Color = Settings.BoxColor
         
         esp.Drawings[3].From = bottomRight
         esp.Drawings[3].To = bottomLeft
         esp.Drawings[3].Visible = true
+        esp.Drawings[3].Color = Settings.BoxColor
         
         esp.Drawings[4].From = bottomLeft
         esp.Drawings[4].To = topLeft
         esp.Drawings[4].Visible = true
-        
-        for i = 5, 12 do
-            esp.Drawings[i].Visible = false
-        end
+        esp.Drawings[4].Color = Settings.BoxColor
     else
-        local cornerSize = math.min(width, height) * 0.25
-        
-        esp.Drawings[5].From = topLeft
-        esp.Drawings[5].To = topLeft + Vector2.new(cornerSize, 0)
-        esp.Drawings[5].Visible = true
-        
-        esp.Drawings[6].From = topLeft
-        esp.Drawings[6].To = topLeft + Vector2.new(0, cornerSize)
-        esp.Drawings[6].Visible = true
-        
-        esp.Drawings[7].From = topRight
-        esp.Drawings[7].To = topRight + Vector2.new(-cornerSize, 0)
-        esp.Drawings[7].Visible = true
-        
-        esp.Drawings[8].From = topRight
-        esp.Drawings[8].To = topRight + Vector2.new(0, cornerSize)
-        esp.Drawings[8].Visible = true
-        
-        esp.Drawings[9].From = bottomLeft
-        esp.Drawings[9].To = bottomLeft + Vector2.new(cornerSize, 0)
-        esp.Drawings[9].Visible = true
-        
-        esp.Drawings[10].From = bottomLeft
-        esp.Drawings[10].To = bottomLeft + Vector2.new(0, -cornerSize)
-        esp.Drawings[10].Visible = true
-        
-        esp.Drawings[11].From = bottomRight
-        esp.Drawings[11].To = bottomRight + Vector2.new(-cornerSize, 0)
-        esp.Drawings[11].Visible = true
-        
-        esp.Drawings[12].From = bottomRight
-        esp.Drawings[12].To = bottomRight + Vector2.new(0, -cornerSize)
-        esp.Drawings[12].Visible = true
-        
         for i = 1, 4 do
             esp.Drawings[i].Visible = false
         end
+        
+        local cornerLength = math.min(width * 0.3, height * 0.15)
+        
+        esp.Drawings[5].From = topLeft
+        esp.Drawings[5].To = Vector2.new(topLeft.X + cornerLength, topLeft.Y)
+        esp.Drawings[5].Visible = true
+        esp.Drawings[5].Color = Settings.BoxColor
+        
+        esp.Drawings[6].From = topLeft
+        esp.Drawings[6].To = Vector2.new(topLeft.X, topLeft.Y + cornerLength)
+        esp.Drawings[6].Visible = true
+        esp.Drawings[6].Color = Settings.BoxColor
+        
+        esp.Drawings[7].From = topRight
+        esp.Drawings[7].To = Vector2.new(topRight.X - cornerLength, topRight.Y)
+        esp.Drawings[7].Visible = true
+        esp.Drawings[7].Color = Settings.BoxColor
+        
+        esp.Drawings[8].From = topRight
+        esp.Drawings[8].To = Vector2.new(topRight.X, topRight.Y + cornerLength)
+        esp.Drawings[8].Visible = true
+        esp.Drawings[8].Color = Settings.BoxColor
+        
+        esp.Drawings[9].From = bottomLeft
+        esp.Drawings[9].To = Vector2.new(bottomLeft.X + cornerLength, bottomLeft.Y)
+        esp.Drawings[9].Visible = true
+        esp.Drawings[9].Color = Settings.BoxColor
+        
+        esp.Drawings[10].From = bottomLeft
+        esp.Drawings[10].To = Vector2.new(bottomLeft.X, bottomLeft.Y - cornerLength)
+        esp.Drawings[10].Visible = true
+        esp.Drawings[10].Color = Settings.BoxColor
+        
+        esp.Drawings[11].From = bottomRight
+        esp.Drawings[11].To = Vector2.new(bottomRight.X - cornerLength, bottomRight.Y)
+        esp.Drawings[11].Visible = true
+        esp.Drawings[11].Color = Settings.BoxColor
+        
+        esp.Drawings[12].From = bottomRight
+        esp.Drawings[12].To = Vector2.new(bottomRight.X, bottomRight.Y - cornerLength)
+        esp.Drawings[12].Visible = true
+        esp.Drawings[12].Color = Settings.BoxColor
     end
     
-    if Settings.Tracers and esp.Tracer then
+    if Settings.Tracers and esp.Tracer and headOnScreen then
         local tracerStart
         if Settings.TracersPosition == "Center" then
             tracerStart = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -175,6 +196,7 @@ local function UpdateESP(esp)
         
         esp.Tracer.From = tracerStart
         esp.Tracer.To = Vector2.new(headScreen.X, headScreen.Y)
+        esp.Tracer.Color = Settings.TracersColor
         esp.Tracer.Visible = true
     else
         if esp.Tracer then
@@ -235,20 +257,6 @@ end
 
 function EspModule:SetBoxType(boxType)
     Settings.BoxType = boxType
-    
-    for player, esp in pairs(ESPObjects) do
-        RemoveESP(esp)
-    end
-    
-    ESPObjects = {}
-    
-    if Settings.Enabled then
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                ESPObjects[player] = CreateESP(player)
-            end
-        end
-    end
 end
 
 function EspModule:SetBoxColor(color)
