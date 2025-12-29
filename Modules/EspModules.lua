@@ -5,10 +5,14 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local ESPObjects = {}
+local RenderConnection = nil
 local Settings = {
     Enabled = false,
     BoxType = "Full",
-    BoxColor = Color3.fromRGB(255, 255, 255)
+    BoxColor = Color3.fromRGB(255, 255, 255),
+    Tracers = false,
+    TracersPosition = "Center",
+    TracersColor = Color3.fromRGB(255, 255, 255)
 }
 
 local function CreateDrawing(Type)
@@ -19,26 +23,31 @@ end
 local function CreateESP(player)
     local esp = {
         Player = player,
-        Drawings = {}
+        Drawings = {},
+        Tracer = nil
     }
     
-    if Settings.BoxType == "Full" then
-        for i = 1, 4 do
-            local line = CreateDrawing("Line")
-            line.Thickness = 2
-            line.Color = Settings.BoxColor
-            line.Visible = false
-            table.insert(esp.Drawings, line)
-        end
-    else
-        for i = 1, 16 do
-            local line = CreateDrawing("Line")
-            line.Thickness = 2
-            line.Color = Settings.BoxColor
-            line.Visible = false
-            table.insert(esp.Drawings, line)
-        end
+    for i = 1, 4 do
+        local line = CreateDrawing("Line")
+        line.Thickness = 2
+        line.Color = Settings.BoxColor
+        line.Visible = false
+        table.insert(esp.Drawings, line)
     end
+    
+    for i = 1, 8 do
+        local line = CreateDrawing("Line")
+        line.Thickness = 2
+        line.Color = Settings.BoxColor
+        line.Visible = false
+        table.insert(esp.Drawings, line)
+    end
+    
+    local tracer = CreateDrawing("Line")
+    tracer.Thickness = 2
+    tracer.Color = Settings.TracersColor
+    tracer.Visible = false
+    esp.Tracer = tracer
     
     return esp
 end
@@ -46,6 +55,9 @@ end
 local function RemoveESP(esp)
     for _, drawing in pairs(esp.Drawings) do
         drawing:Remove()
+    end
+    if esp.Tracer then
+        esp.Tracer:Remove()
     end
 end
 
@@ -107,43 +119,66 @@ local function UpdateESP(esp)
         esp.Drawings[4].From = bottomLeft
         esp.Drawings[4].To = topLeft
         esp.Drawings[4].Visible = true
+        
+        for i = 5, 12 do
+            esp.Drawings[i].Visible = false
+        end
     else
         local cornerSize = math.min(width, height) * 0.25
         
-        esp.Drawings[1].From = topLeft
-        esp.Drawings[1].To = topLeft + Vector2.new(cornerSize, 0)
-        esp.Drawings[1].Visible = true
-        
-        esp.Drawings[2].From = topLeft
-        esp.Drawings[2].To = topLeft + Vector2.new(0, cornerSize)
-        esp.Drawings[2].Visible = true
-        
-        esp.Drawings[3].From = topRight
-        esp.Drawings[3].To = topRight + Vector2.new(-cornerSize, 0)
-        esp.Drawings[3].Visible = true
-        
-        esp.Drawings[4].From = topRight
-        esp.Drawings[4].To = topRight + Vector2.new(0, cornerSize)
-        esp.Drawings[4].Visible = true
-        
-        esp.Drawings[5].From = bottomLeft
-        esp.Drawings[5].To = bottomLeft + Vector2.new(cornerSize, 0)
+        esp.Drawings[5].From = topLeft
+        esp.Drawings[5].To = topLeft + Vector2.new(cornerSize, 0)
         esp.Drawings[5].Visible = true
         
-        esp.Drawings[6].From = bottomLeft
-        esp.Drawings[6].To = bottomLeft + Vector2.new(0, -cornerSize)
+        esp.Drawings[6].From = topLeft
+        esp.Drawings[6].To = topLeft + Vector2.new(0, cornerSize)
         esp.Drawings[6].Visible = true
         
-        esp.Drawings[7].From = bottomRight
-        esp.Drawings[7].To = bottomRight + Vector2.new(-cornerSize, 0)
+        esp.Drawings[7].From = topRight
+        esp.Drawings[7].To = topRight + Vector2.new(-cornerSize, 0)
         esp.Drawings[7].Visible = true
         
-        esp.Drawings[8].From = bottomRight
-        esp.Drawings[8].To = bottomRight + Vector2.new(0, -cornerSize)
+        esp.Drawings[8].From = topRight
+        esp.Drawings[8].To = topRight + Vector2.new(0, cornerSize)
         esp.Drawings[8].Visible = true
         
-        for i = 9, 16 do
+        esp.Drawings[9].From = bottomLeft
+        esp.Drawings[9].To = bottomLeft + Vector2.new(cornerSize, 0)
+        esp.Drawings[9].Visible = true
+        
+        esp.Drawings[10].From = bottomLeft
+        esp.Drawings[10].To = bottomLeft + Vector2.new(0, -cornerSize)
+        esp.Drawings[10].Visible = true
+        
+        esp.Drawings[11].From = bottomRight
+        esp.Drawings[11].To = bottomRight + Vector2.new(-cornerSize, 0)
+        esp.Drawings[11].Visible = true
+        
+        esp.Drawings[12].From = bottomRight
+        esp.Drawings[12].To = bottomRight + Vector2.new(0, -cornerSize)
+        esp.Drawings[12].Visible = true
+        
+        for i = 1, 4 do
             esp.Drawings[i].Visible = false
+        end
+    end
+    
+    if Settings.Tracers and esp.Tracer then
+        local tracerStart
+        if Settings.TracersPosition == "Center" then
+            tracerStart = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        elseif Settings.TracersPosition == "Bottom" then
+            tracerStart = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+        else
+            tracerStart = Vector2.new(Camera.ViewportSize.X / 2, 0)
+        end
+        
+        esp.Tracer.From = tracerStart
+        esp.Tracer.To = Vector2.new(headScreen.X, headScreen.Y)
+        esp.Tracer.Visible = true
+    else
+        if esp.Tracer then
+            esp.Tracer.Visible = false
         end
     end
 end
@@ -170,7 +205,11 @@ function EspModule:Enable()
         end
     end)
     
-    RunService.RenderStepped:Connect(function()
+    if RenderConnection then
+        RenderConnection:Disconnect()
+    end
+    
+    RenderConnection = RunService.RenderStepped:Connect(function()
         if Settings.Enabled then
             for player, esp in pairs(ESPObjects) do
                 UpdateESP(esp)
@@ -181,6 +220,11 @@ end
 
 function EspModule:Disable()
     Settings.Enabled = false
+    
+    if RenderConnection then
+        RenderConnection:Disconnect()
+        RenderConnection = nil
+    end
     
     for player, esp in pairs(ESPObjects) do
         RemoveESP(esp)
@@ -213,6 +257,24 @@ function EspModule:SetBoxColor(color)
     for _, esp in pairs(ESPObjects) do
         for _, drawing in pairs(esp.Drawings) do
             drawing.Color = color
+        end
+    end
+end
+
+function EspModule:SetTracers(enabled)
+    Settings.Tracers = enabled
+end
+
+function EspModule:SetTracersPosition(position)
+    Settings.TracersPosition = position
+end
+
+function EspModule:SetTracersColor(color)
+    Settings.TracersColor = color
+    
+    for _, esp in pairs(ESPObjects) do
+        if esp.Tracer then
+            esp.Tracer.Color = color
         end
     end
 end
