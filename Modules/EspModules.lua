@@ -427,13 +427,18 @@ function EspModule:Enable()
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
-            ESPObjects[player] = CreateESP(player)
+            if not Settings.TeamCheck or player.Team ~= LocalPlayer.Team then
+                ESPObjects[player] = CreateESP(player)
+            end
         end
     end
     
     Players.PlayerAdded:Connect(function(player)
         if Settings.Enabled and player ~= LocalPlayer then
-            ESPObjects[player] = CreateESP(player)
+            if not Settings.TeamCheck or player.Team ~= LocalPlayer.Team then
+                task.wait(0.5)
+                ESPObjects[player] = CreateESP(player)
+            end
         end
     end)
     
@@ -451,7 +456,12 @@ function EspModule:Enable()
     RenderConnection = RunService.RenderStepped:Connect(function()
         if Settings.Enabled then
             for player, esp in pairs(ESPObjects) do
-                UpdateESP(esp)
+                if player and player.Parent then
+                    UpdateESP(esp)
+                else
+                    RemoveESP(esp)
+                    ESPObjects[player] = nil
+                end
             end
         end
     end)
@@ -531,6 +541,21 @@ end
 
 function EspModule:SetTeamCheck(enabled)
     Settings.TeamCheck = enabled
+    
+    if enabled then
+        for player, esp in pairs(ESPObjects) do
+            if player.Team == LocalPlayer.Team then
+                RemoveESP(esp)
+                ESPObjects[player] = nil
+            end
+        end
+    else
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and not ESPObjects[player] then
+                ESPObjects[player] = CreateESP(player)
+            end
+        end
+    end
 end
 
 function EspModule:SetHealthBar(enabled)
